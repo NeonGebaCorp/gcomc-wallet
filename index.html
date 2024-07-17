@@ -1,0 +1,171 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>GCOMC Wallet</title>
+    <link href="https://maxcdn.bootstrapcdn.com/bootstrap/4.5.2/css/bootstrap.min.css" rel="stylesheet">
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/3.5.1/jquery.min.js"></script>
+    <script>
+        const SERVER_URL = 'http://neoncorp.me:8853';
+
+        $(document).ready(function() {
+            $("#createWalletForm").submit(function(event) {
+                event.preventDefault();
+                const passphrase = $("#createPassphrase").val();
+                $.ajax({
+                    type: "POST",
+                    url: SERVER_URL + "/new_wallet",
+                    contentType: "application/json",
+                    data: JSON.stringify({ passphrase: passphrase }),
+                    success: function(response) {
+                        const walletHash = response.wallet_hash;
+                        const blob = new Blob([walletHash], { type: 'text/plain' });
+                        const url = URL.createObjectURL(blob);
+                        const a = document.createElement('a');
+                        a.href = url;
+                        a.download = 'wallet_hash.txt';
+                        document.body.appendChild(a);
+                        a.click();
+                        document.body.removeChild(a);
+                        $("#walletHash").val(walletHash);
+                        $("#createWalletSection").hide();
+                        $("#dashboardSection").show();
+                        showWalletBalance(walletHash, passphrase);
+                    }
+                });
+            });
+
+            $("#restoreWalletForm").submit(function(event) {
+                event.preventDefault();
+                const walletHash = $("#restoreWalletHash").val();
+                const passphrase = $("#restorePassphrase").val();
+                $.ajax({
+                    type: "POST",
+                    url: SERVER_URL + "/restore_wallet",
+                    contentType: "application/json",
+                    data: JSON.stringify({ wallet_hash: walletHash, passphrase: passphrase }),
+                    success: function(response) {
+                        $("#walletHash").val(walletHash);
+                        $("#createWalletSection").hide();
+                        $("#dashboardSection").show();
+                        showWalletBalance(walletHash, passphrase);
+                    },
+                    error: function() {
+                        alert("Wallet not found or incorrect passphrase");
+                    }
+                });
+            });
+
+            $("#sendFundsForm").submit(function(event) {
+                event.preventDefault();
+                const sender = $("#walletHash").val();
+                const receiver = $("#sendReceiver").val();
+                const amount = $("#sendAmount").val();
+                const passphrase = $("#sendPassphrase").val();
+                $.ajax({
+                    type: "POST",
+                    url: SERVER_URL + "/send",
+                    contentType: "application/json",
+                    data: JSON.stringify({ sender: sender, receiver: receiver, amount: parseInt(amount) }),
+                    success: function(response) {
+                        alert(JSON.stringify(response, null, 2));
+                        showWalletBalance(sender, passphrase);
+                    },
+                    error: function(response) {
+                        alert(JSON.stringify(response.responseJSON, null, 2));
+                    }
+                });
+            });
+        });
+
+        function showWalletBalance(walletHash, passphrase) {
+            $.ajax({
+                type: "POST",
+                url: SERVER_URL + "/restore_wallet",
+                contentType: "application/json",
+                data: JSON.stringify({ wallet_hash: walletHash, passphrase: passphrase }),
+                success: function(response) {
+                    $("#walletBalance").text(response.balance + " GCOMC");
+                    showTransactions(walletHash);
+                }
+            });
+        }
+
+        function showTransactions(walletHash) {
+            $.ajax({
+                type: "POST",
+                url: SERVER_URL + "/transactions",
+                contentType: "application/json",
+                data: JSON.stringify({ wallet_hash: walletHash }),
+                success: function(response) {
+                    const transactions = response.transactions;
+                    let transactionsHtml = "";
+                    transactions.forEach(tx => {
+                        transactionsHtml += `<li class="list-group-item">${tx[1]} -> ${tx[2]}, Amount: ${tx[3]} GCOMC</li>`;
+                    });
+                    $("#transactionList").html(transactionsHtml);
+                }
+            });
+        }
+    </script>
+</head>
+<body>
+    <div class="container mt-5">
+        <div id="createWalletSection">
+            <h2>Create Wallet</h2>
+            <form id="createWalletForm">
+                <div class="form-group">
+                    <label for="createPassphrase">Passphrase:</label>
+                    <input type="password" class="form-control" id="createPassphrase" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Create Wallet</button>
+            </form>
+        </div>
+        
+        <div id="restoreWalletSection" class="mt-5">
+            <h2>Restore Wallet</h2>
+            <form id="restoreWalletForm">
+                <div class="form-group">
+                    <label for="restoreWalletHash">Wallet Hash:</label>
+                    <input type="text" class="form-control" id="restoreWalletHash" required>
+                </div>
+                <div class="form-group">
+                    <label for="restorePassphrase">Passphrase:</label>
+                    <input type="password" class="form-control" id="restorePassphrase" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Restore Wallet</button>
+            </form>
+        </div>
+
+        <div id="dashboardSection" class="mt-5" style="display:none;">
+            <h2>Dashboard</h2>
+            <input type="hidden" id="walletHash">
+            <div class="form-group">
+                <label>Wallet Balance:</label>
+                <p id="walletBalance">0 GCOMC</p>
+            </div>
+            <h3>Send Funds</h3>
+            <form id="sendFundsForm">
+                <div class="form-group">
+                    <label for="sendReceiver">Receiver Address:</label>
+                    <input type="text" class="form-control" id="sendReceiver" required>
+                </div>
+                <div class="form-group">
+                    <label for="sendAmount">Amount:</label>
+                    <input type="number" class="form-control" id="sendAmount" required>
+                </div>
+                <div class="form-group">
+                    <label for="sendPassphrase">Passphrase:</label>
+                    <input type="password" class="form-control" id="sendPassphrase" required>
+                </div>
+                <button type="submit" class="btn btn-primary">Send Funds</button>
+            </form>
+            
+            <h3 class="mt-5">Transactions</h3>
+            <ul class="list-group" id="transactionList">
+            </ul>
+        </div>
+    </div>
+</body>
+</html>
