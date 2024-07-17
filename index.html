@@ -20,14 +20,7 @@
                     data: JSON.stringify({ passphrase: passphrase }),
                     success: function(response) {
                         const walletHash = response.wallet_hash;
-                        const blob = new Blob([walletHash], { type: 'text/plain' });
-                        const url = URL.createObjectURL(blob);
-                        const a = document.createElement('a');
-                        a.href = url;
-                        a.download = 'wallet_hash.txt';
-                        document.body.appendChild(a);
-                        a.click();
-                        document.body.removeChild(a);
+                        downloadWalletHash(walletHash);
                         $("#walletHash").val(walletHash);
                         $("#createWalletSection").hide();
                         $("#dashboardSection").show();
@@ -78,6 +71,17 @@
                 });
             });
         });
+
+        function downloadWalletHash(walletHash) {
+            const blob = new Blob([walletHash], { type: 'text/plain' });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'wallet_hash.txt';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+        }
 
         function showWalletBalance(walletHash, passphrase) {
             $.ajax({
